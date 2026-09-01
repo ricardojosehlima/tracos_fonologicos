@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#111418" />
+<title>Filtro de Traços Consonantais</title>
+
+<style>
+  :root {
+    --bg: #111418;
+    --panel: #191e24;
+    --panel-2: #20262e;
+    --cell: #171c22;
+    --grid: #343d48;
+    --text: #edf1f5;
+    --muted: #9ba7b5;
+
+    --candidate: #43a675;
+    --candidate-dark: #267a53;
+    --candidate-soft: rgba(67, 166, 117, 0.23);
+
+    /* Palette sampled from the classroom image */
+    --recuado: #b8a1f6;
+    --coronal: #e9e79e;
+    --continuo: #96bddc;
+    --sonoro: #e9ba99;
+    --soante: #f59a9a;
+    --lateral: #7ab58b;
+
+    --focus: #9fc5ff;
+    --dim: 0.19;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", sans-serif;
+  }
+
+  button {
+    font: inherit;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:focus-visible,
+  input:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+  }
+
+  main {
+    width: min(1440px, 97vw);
+    margin: 24px auto 44px;
+  }
+
+  .title {
+    display: inline-block;
+    margin: 0;
+    font-size: clamp(1.55rem, 5vw, 2.75rem);
+    font-weight: 950;
+    letter-spacing: 0.015em;
+    line-height: 1.08;
+    color: transparent;
+    background:
+      linear-gradient(
+        90deg,
+        var(--recuado) 0%,
+        var(--continuo) 23%,
+        var(--soante) 43%,
+        var(--coronal) 62%,
+        var(--sonoro) 80%,
+        var(--lateral) 100%
+      );
+    background-clip: text;
+    -webkit-background-clip: text;
+  }
+
+  .intro {
+    max-width: 1000px;
+    margin: 10px 0 16px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .candidate-panel {
+    margin-bottom: 16px;
+    padding: 14px;
+    border: 1px solid var(--grid);
+    border-radius: 14px;
+    background: var(--panel);
+  }
+
+  .candidate-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 14px;
+    margin-bottom: 10px;
+  }
+
+  .candidate-heading h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  #status {
+    color: var(--muted);
+    font-weight: 750;
+  }
+
+  .candidate-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 46px;
+    align-items: center;
+  }
+
+  .candidate-chip {
+    display: inline-grid;
+    place-items: center;
+    min-width: 52px;
+    min-height: 44px;
+    padding: 5px 10px;
+    border: 2px solid var(--candidate);
+    border-radius: 11px;
+    background: var(--candidate-soft);
+    color: white;
+    font-family: "Charis SIL", "Doulos SIL", "Noto Sans", serif;
+    font-size: 1.35rem;
+    font-weight: 850;
+  }
+
+  .candidate-chip.initial {
+    border-color: var(--grid);
+    background: var(--cell);
+    color: var(--muted);
+  }
+
+  .interaction-area {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .table-section {
+    order: 1;
+  }
+
+  .controls {
+    order: 2;
+    margin-top: 17px;
+    padding: 16px;
+    border: 1px solid var(--grid);
+    border-radius: 14px;
+    background: var(--panel);
+  }
+
+  .controls-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 13px;
+  }
+
+  .controls-header h2 {
+    margin: 0;
+    font-size: 1.08rem;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .utility-button {
+    min-height: 44px;
+    border: 1px solid var(--grid);
+    border-radius: 10px;
+    padding: 8px 12px;
+    background: #252c35;
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 750;
+  }
+
+  .utility-button:hover:not(:disabled) {
+    border-color: var(--focus);
+  }
+
+  .utility-button:disabled {
+    opacity: 0.42;
+    cursor: default;
+  }
+
+  .feature-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(285px, 1fr));
+    gap: 10px 16px;
+  }
+
+  .feature-control {
+    --feature-color: var(--muted);
+
+    display: grid;
+    grid-template-columns: minmax(118px, 1fr) 62px 62px;
+    align-items: center;
+    gap: 9px;
+    min-height: 62px;
+    padding: 8px 10px 8px 13px;
+    border: 1px solid var(--grid);
+    border-left: 6px solid var(--feature-color);
+    border-radius: 11px;
+    background: var(--cell);
+  }
+
+  .feature-control[data-feature="recuado"] {
+    --feature-color: var(--recuado);
+  }
+
+  .feature-control[data-feature="coronal"] {
+    --feature-color: var(--coronal);
+  }
+
+  .feature-control[data-feature="contínuo"] {
+    --feature-color: var(--continuo);
+  }
+
+  .feature-control[data-feature="sonoro"] {
+    --feature-color: var(--sonoro);
+  }
+
+  .feature-control[data-feature="soante"] {
+    --feature-color: var(--soante);
+  }
+
+  .feature-control[data-feature="lateral"] {
+    --feature-color: var(--lateral);
+  }
+
+  .feature-control.active {
+    box-shadow: 0 0 0 1px var(--feature-color) inset;
+  }
+
+  .feature-name {
+    color: var(--feature-color);
+    font-size: 1rem;
+    font-weight: 900;
+    letter-spacing: 0.015em;
+  }
+
+  .value-button {
+    position: relative;
+    min-width: 56px;
+    min-height: 48px;
+    border: 2px solid var(--grid);
+    border-radius: 10px;
+    background: #242b34;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1.25rem;
+    font-weight: 950;
+  }
+
+  .value-button:hover {
+    border-color: var(--feature-color);
+  }
+
+  .value-button[aria-pressed="true"] {
+    border-color: var(--feature-color);
+    background: var(--feature-color);
+    color: #15181c;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.12) inset;
+  }
+
+  .value-button[aria-pressed="true"]::before {
+    content: "✓";
+    position: absolute;
+    top: 2px;
+    left: 6px;
+    font-size: 0.72rem;
+    font-weight: 1000;
+  }
+
+  .history {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 28px;
+    margin-top: 13px;
+  }
+
+  .history-chip {
+    --chip-color: var(--candidate);
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 4px 9px;
+    border: 1px solid var(--chip-color);
+    border-radius: 999px;
+    background: rgba(67, 166, 117, 0.11);
+    color: var(--text);
+    font-size: 0.88rem;
+    font-weight: 750;
+  }
+
+  .history-empty {
+    color: var(--muted);
+  }
+
+  .scroll-hint {
+    display: none;
+    margin: 0 0 7px;
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--grid);
+    border-radius: 14px;
+    background: var(--panel);
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  table {
+    width: 100%;
+    min-width: 1055px;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+  }
+
+  th,
+  td {
+    border-right: 1px solid var(--grid);
+    border-bottom: 1px solid var(--grid);
+    text-align: center;
+    transition:
+      background 140ms ease,
+      opacity 140ms ease,
+      color 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  th:last-child,
+  td:last-child {
+    border-right: none;
+  }
+
+  tbody tr:last-child th,
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  thead th {
+    padding: 12px 6px;
+    background: var(--panel-2);
+  }
+
+  .corner {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    width: 138px;
+    min-width: 138px;
+    color: var(--muted);
+  }
+
+  .phoneme {
+    min-width: 48px;
+    font-family: "Charis SIL", "Doulos SIL", "Noto Sans", serif;
+    font-size: 1.27rem;
+    font-weight: 850;
+  }
+
+  .feature-cell {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    width: 138px;
+    min-width: 138px;
+    padding: 13px 9px;
+    background: var(--panel-2);
+    font-size: 0.94rem;
+    font-weight: 850;
+  }
+
+  .mark {
+    height: 54px;
+    background: var(--cell);
+    font-size: 1.35rem;
+    font-weight: 900;
+  }
+
+  .candidate-column {
+    background: var(--candidate-soft) !important;
+    box-shadow:
+      2px 0 0 rgba(67, 166, 117, 0.45) inset,
+      -2px 0 0 rgba(67, 166, 117, 0.45) inset;
+  }
+
+  thead .candidate-column {
+    background: var(--candidate-dark) !important;
+    color: white;
+  }
+
+  .noncandidate-column {
+    opacity: var(--dim);
+  }
+
+  .no-candidates {
+    color: #ff9b9b;
+    font-weight: 800;
+  }
+
+  @media (max-width: 850px) {
+    main {
+      width: min(100%, 760px);
+      margin-top: 14px;
+      padding: 0 10px 30px;
+    }
+
+    .intro {
+      font-size: 0.95rem;
+    }
+
+    /*
+      On phones, controls come before the matrix. In the document they still
+      follow it, preserving the desktop version requested by the user.
+    */
+    .controls {
+      order: 1;
+      margin: 0 0 14px;
+      padding: 13px;
+    }
+
+    .table-section {
+      order: 2;
+    }
+
+    .feature-options {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .controls-header {
+      align-items: flex-start;
+    }
+
+    .toolbar {
+      width: 100%;
+      margin-left: 0;
+    }
+
+    .utility-button {
+      flex: 1 1 130px;
+    }
+
+    .feature-control {
+      grid-template-columns: minmax(108px, 1fr) 64px 64px;
+      min-height: 60px;
+    }
+
+    .scroll-hint {
+      display: block;
+    }
+
+    .corner,
+    .feature-cell {
+      width: 112px;
+      min-width: 112px;
+    }
+
+    table {
+      min-width: 1010px;
+    }
+
+    .candidate-panel {
+      padding: 12px;
+    }
+
+    .candidate-chip {
+      min-width: 48px;
+      min-height: 43px;
+    }
+  }
+
+  @media (max-width: 390px) {
+    .feature-control {
+      grid-template-columns: minmax(94px, 1fr) 58px 58px;
+      gap: 7px;
+      padding-left: 10px;
+    }
+
+    .feature-name {
+      font-size: 0.93rem;
+    }
+
+    .value-button {
+      min-width: 52px;
+    }
+  }
+
+
+  /* --------- Modo 2: comparação de fonemas --------- */
+  .mode-switch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 0 0 16px;
+    padding: 6px;
+    border: 1px solid var(--grid);
+    border-radius: 13px;
+    background: var(--panel);
+  }
+
+  .mode-button {
+    min-height: 48px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    padding: 9px 12px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-weight: 850;
+  }
+
+  .mode-button[aria-pressed="true"] {
+    background: #2a323c;
+    border-color: var(--focus);
+    color: var(--text);
+  }
+
+  .compare-panel {
+    display: none;
+    margin-bottom: 16px;
+    padding: 14px;
+    border: 1px solid var(--grid);
+    border-radius: 14px;
+    background: var(--panel);
+  }
+
+  .compare-panel.active {
+    display: block;
+  }
+
+  .compare-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin-bottom: 12px;
+  }
+
+  .compare-heading h2 {
+    margin: 0;
+    font-size: 1.08rem;
+  }
+
+  .compare-note {
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.4;
+  }
+
+  .phoneme-selector {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(52px, 1fr));
+    gap: 8px;
+  }
+
+  .phoneme-select-button {
+    min-height: 48px;
+    border: 2px solid var(--grid);
+    border-radius: 10px;
+    background: #242b34;
+    color: var(--text);
+    cursor: pointer;
+    font-family: "Charis SIL", "Doulos SIL", "Noto Sans", serif;
+    font-size: 1.24rem;
+    font-weight: 850;
+  }
+
+  .phoneme-select-button[aria-pressed="true"] {
+    border-color: var(--focus);
+    background: #35516f;
+    color: white;
+  }
+
+  .common-panel {
+    margin-top: 14px;
+    padding-top: 13px;
+    border-top: 1px solid var(--grid);
+  }
+
+  .common-title {
+    margin: 0 0 9px;
+    font-size: 0.98rem;
+    font-weight: 850;
+  }
+
+  .common-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 34px;
+    align-items: center;
+  }
+
+  .common-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 5px 10px;
+    border: 1px solid var(--candidate);
+    border-radius: 999px;
+    background: var(--candidate-soft);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .compare-empty {
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .selected-phoneme-column {
+    background: rgba(83, 129, 176, 0.22) !important;
+    box-shadow:
+      2px 0 0 rgba(139, 184, 255, 0.55) inset,
+      -2px 0 0 rgba(139, 184, 255, 0.55) inset;
+  }
+
+  thead .selected-phoneme-column {
+    background: #35516f !important;
+    color: white;
+  }
+
+  .common-feature-cell {
+    background: var(--candidate-dark) !important;
+    color: white !important;
+  }
+
+  .common-mark {
+    background: var(--candidate-soft) !important;
+    color: white;
+    box-shadow: 0 0 0 2px rgba(67, 166, 117, 0.46) inset;
+  }
+
+  .filter-only.hidden-mode,
+  .compare-only.hidden-mode {
+    display: none !important;
+  }
+
+  @media (max-width: 850px) {
+    .mode-switch {
+      grid-template-columns: 1fr;
+    }
+
+    .phoneme-selector {
+      grid-template-columns: repeat(5, minmax(48px, 1fr));
+    }
+
+    .compare-panel {
+      padding: 12px;
+    }
+  }
+
+  @media (max-width: 390px) {
+    .phoneme-selector {
+      grid-template-columns: repeat(4, minmax(48px, 1fr));
+    }
+  }
+
+
+  .js-warning {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    border: 1px solid #e9ba99;
+    border-radius: 12px;
+    background: rgba(233, 186, 153, 0.10);
+    color: var(--text);
+    line-height: 1.45;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+
+<body>
+<main>
+
+  <div id="jsWarning" class="js-warning">
+    Esta atividade precisa ser aberta como uma página da web no Safari, Chrome
+    ou outro navegador. Um visualizador de arquivos pode mostrar a página,
+    mas bloquear os botões e o JavaScript.
+  </div>
+
+  <header>
+    <h1 class="title">FILTRO DE TRAÇOS CONSONANTAIS</h1>
+    <p class="intro">
+      Selecione <strong>+</strong> ou <strong>−</strong> para cada traço.
+      Permanecem destacados apenas os fonemas compatíveis com
+      <strong>todas</strong> as marcações escolhidas.
+      Toque novamente em uma marcação ativa para removê-la.
+    </p>
+  </header>
+
+
+  <nav class="mode-switch" aria-label="Modo de uso">
+    <button
+      id="filterModeButton"
+      class="mode-button"
+      type="button"
+      aria-pressed="true"
+    >
+      FILTRAR POR TRAÇOS
+    </button>
+    <button
+      id="compareModeButton"
+      class="mode-button"
+      type="button"
+      aria-pressed="false"
+    >
+      COMPARAR FONEMAS
+    </button>
+  </nav>
+
+  <section id="comparePanel" class="compare-panel compare-only" aria-labelledby="compareTitle">
+    <div class="compare-heading">
+      <h2 id="compareTitle">Selecione os fonemas</h2>
+      <button id="clearPhonemes" class="utility-button" type="button" disabled>
+        Limpar seleção
+      </button>
+    </div>
+    <p class="compare-note">
+      Os traços destacados em verde são aqueles cuja marcação é igual em
+      <strong>todos</strong> os fonemas selecionados.
+    </p>
+    <div id="phonemeSelector" class="phoneme-selector"></div>
+
+    <div class="common-panel">
+      <p class="common-title">Traços em comum</p>
+      <div id="commonList" class="common-list" aria-live="polite">
+        <span class="compare-empty">Selecione pelo menos dois fonemas.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="candidate-panel filter-only" aria-labelledby="candidateTitle">
+    <div class="candidate-heading">
+      <h2 id="candidateTitle">Fonemas candidatos</h2>
+      <span id="status" aria-live="polite">19 candidatos · 0 traços escolhidos</span>
+    </div>
+    <div id="candidateList" class="candidate-list" aria-live="polite"></div>
+  </section>
+
+  <div class="interaction-area">
+    <section class="table-section" aria-label="Matriz de traços">
+      <p class="scroll-hint">Deslize a matriz horizontalmente para ver todos os fonemas.</p>
+      <div class="table-wrap" id="tableWrap" tabindex="0" aria-label="Matriz rolável horizontalmente">
+        <table id="featureTable">
+          <thead>
+            <tr id="phonemeHeader">
+              <th class="corner">Traço</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="controls filter-only" aria-labelledby="controlsTitle">
+      <div class="controls-header">
+        <h2 id="controlsTitle">Marcações reveladas</h2>
+        <div class="toolbar">
+          <button id="undo" class="utility-button" type="button" disabled>
+            Desfazer último
+          </button>
+          <button id="reset" class="utility-button" type="button" disabled>
+            Limpar tudo
+          </button>
+        </div>
+      </div>
+
+      <div id="featureOptions" class="feature-options"></div>
+      <div id="history" class="history" aria-live="polite">
+        <span class="history-empty">Nenhum traço escolhido.</span>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const jsWarning = document.querySelector("#jsWarning");
+if (jsWarning) jsWarning.style.display = "none";
+const features = [
+  { key: "recuado", label: "RECUADO", color: "var(--recuado)" },
+  { key: "coronal", label: "CORONAL", color: "var(--coronal)" },
+  { key: "contínuo", label: "CONTÍNUO", color: "var(--continuo)" },
+  { key: "soante", label: "SOANTE", color: "var(--soante)" },
+  { key: "sonoro", label: "SONORO", color: "var(--sonoro)" },
+  { key: "lateral", label: "LATERAL", color: "var(--lateral)" }
+];
+
+const consonants = [
+  { key: "p", symbol: "/p/", values: ["−","−","−","−","−","−"] },
+  { key: "b", symbol: "/b/", values: ["−","−","−","−","+","−"] },
+  { key: "t", symbol: "/t/", values: ["−","+","−","−","−","−"] },
+  { key: "d", symbol: "/d/", values: ["−","+","−","−","+","−"] },
+  { key: "k", symbol: "/k/", values: ["+","−","−","−","−","−"] },
+  { key: "g", symbol: "/g/", values: ["+","−","−","−","+","−"] },
+  { key: "f", symbol: "/f/", values: ["−","−","+","−","−","−"] },
+  { key: "v", symbol: "/v/", values: ["−","−","+","−","+","−"] },
+  { key: "s", symbol: "/s/", values: ["−","+","+","−","−","−"] },
+  { key: "z", symbol: "/z/", values: ["−","+","+","−","+","−"] },
+  { key: "S", symbol: "/ʃ/", values: ["+","+","+","−","−","−"] },
+  { key: "Z", symbol: "/ʒ/", values: ["+","+","+","−","+","−"] },
+  { key: "m", symbol: "/m/", values: ["−","−","−","+","+","−"] },
+  { key: "n", symbol: "/n/", values: ["−","+","−","+","+","−"] },
+  { key: "N", symbol: "/ɲ/", values: ["+","+","−","+","+","−"] },
+  { key: "l", symbol: "/l/", values: ["−","−","+","+","+","+"] },
+  { key: "L", symbol: "/ʎ/", values: ["+","+","+","+","+","+"] },
+  { key: "r", symbol: "/ɾ/", values: ["−","+","+","+","+","−"] },
+  { key: "x", symbol: "/x/", values: ["+","−","+","−","−","−"] }
+];
+
+const selections = {};
+const selectionOrder = [];
+
+const header = document.querySelector("#phonemeHeader");
+const tbody = document.querySelector("#featureTable tbody");
+const featureOptions = document.querySelector("#featureOptions");
+const candidateList = document.querySelector("#candidateList");
+const status = document.querySelector("#status");
+const historyBox = document.querySelector("#history");
+const resetButton = document.querySelector("#reset");
+const undoButton = document.querySelector("#undo");
+
+const filterModeButton = document.querySelector("#filterModeButton");
+const compareModeButton = document.querySelector("#compareModeButton");
+const comparePanel = document.querySelector("#comparePanel");
+const phonemeSelector = document.querySelector("#phonemeSelector");
+const commonList = document.querySelector("#commonList");
+const clearPhonemesButton = document.querySelector("#clearPhonemes");
+const selectedPhonemes = new Set();
+let currentMode = "filter";
+
+
+function buildGrid() {
+  consonants.forEach((consonant, consonantIndex) => {
+    const th = document.createElement("th");
+    th.className = "phoneme";
+    th.textContent = consonant.symbol;
+    th.dataset.consonantIndex = consonantIndex;
+    th.title = `Rótulo interno: ${consonant.key}`;
+    header.appendChild(th);
+  });
+
+  features.forEach((feature, featureIndex) => {
+    const tr = document.createElement("tr");
+    tr.dataset.featureKey = feature.key;
+
+    const featureCell = document.createElement("th");
+    featureCell.className = "feature-cell";
+    featureCell.dataset.featureKey = feature.key;
+    featureCell.scope = "row";
+    featureCell.textContent = feature.label;
+    featureCell.style.color = feature.color;
+    tr.appendChild(featureCell);
+
+    consonants.forEach((consonant, consonantIndex) => {
+      const value = consonant.values[featureIndex];
+      const td = document.createElement("td");
+      td.className = "mark";
+      td.textContent = value;
+      td.dataset.consonantIndex = consonantIndex;
+      td.dataset.featureKey = feature.key;
+      td.setAttribute(
+        "aria-label",
+        `${consonant.symbol}: ${feature.label.toLowerCase()} ${
+          value === "+" ? "sim" : "não"
+        }`
+      );
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+
+function buildControls() {
+  features.forEach(feature => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "feature-control";
+    wrapper.dataset.feature = feature.key;
+
+    const name = document.createElement("span");
+    name.className = "feature-name";
+    name.textContent = feature.label;
+    wrapper.appendChild(name);
+
+    ["+", "−"].forEach(value => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "value-button";
+      button.textContent = value;
+      button.dataset.feature = feature.key;
+      button.dataset.value = value;
+      button.setAttribute("aria-pressed", "false");
+      button.setAttribute(
+        "aria-label",
+        `${feature.label}: ${value === "+" ? "sim" : "não"}`
+      );
+
+      button.addEventListener("click", () => {
+        toggleSelection(feature.key, value);
+      });
+
+      wrapper.appendChild(button);
+    });
+
+    featureOptions.appendChild(wrapper);
+  });
+}
+
+function toggleSelection(feature, value) {
+  if (selections[feature] === value) {
+    delete selections[feature];
+    const position = selectionOrder.indexOf(feature);
+    if (position !== -1) selectionOrder.splice(position, 1);
+  } else {
+    const isNewFeature = !(feature in selections);
+    selections[feature] = value;
+    if (isNewFeature) selectionOrder.push(feature);
+  }
+
+  render();
+}
+
+function undoLast() {
+  const lastFeature = selectionOrder.pop();
+  if (!lastFeature) return;
+
+  delete selections[lastFeature];
+  render();
+}
+
+function clearAll() {
+  Object.keys(selections).forEach(feature => delete selections[feature]);
+  selectionOrder.length = 0;
+  render();
+}
+
+function matchesSelections(consonant) {
+  return Object.entries(selections).every(([featureKey, selectedValue]) => {
+    const featureIndex = features.findIndex(feature => feature.key === featureKey);
+    return consonant.values[featureIndex] === selectedValue;
+  });
+}
+
+function renderCandidateList(matchingIndexes, activeCount) {
+  candidateList.innerHTML = "";
+
+  if (matchingIndexes.length === 0) {
+    const message = document.createElement("span");
+    message.className = "no-candidates";
+    message.textContent = "Nenhum fonema corresponde a essa combinação.";
+    candidateList.appendChild(message);
+    return;
+  }
+
+  matchingIndexes.forEach(index => {
+    const chip = document.createElement("span");
+    chip.className = `candidate-chip${activeCount === 0 ? " initial" : ""}`;
+    chip.textContent = consonants[index].symbol;
+    candidateList.appendChild(chip);
+  });
+}
+
+function renderHistory() {
+  historyBox.innerHTML = "";
+
+  if (selectionOrder.length === 0) {
+    historyBox.innerHTML =
+      '<span class="history-empty">Nenhum traço escolhido.</span>';
+    return;
+  }
+
+  selectionOrder.forEach((featureKey, index) => {
+    const feature = features.find(item => item.key === featureKey);
+    const chip = document.createElement("span");
+    chip.className = "history-chip";
+    chip.style.setProperty("--chip-color", feature.color);
+    chip.textContent = `${index + 1}. ${feature.label.toLowerCase()}: ${selections[featureKey]}`;
+    historyBox.appendChild(chip);
+  });
+}
+
+function render() {
+  const activeCount = selectionOrder.length;
+  const matchingIndexes = [];
+
+  consonants.forEach((consonant, index) => {
+    if (matchesSelections(consonant)) matchingIndexes.push(index);
+  });
+
+  const matchingSet = new Set(matchingIndexes);
+
+  document.querySelectorAll("[data-consonant-index]").forEach(cell => {
+    const index = Number(cell.dataset.consonantIndex);
+    const isCandidate = matchingSet.has(index);
+
+    cell.classList.toggle(
+      "candidate-column",
+      activeCount > 0 && isCandidate
+    );
+
+    cell.classList.toggle(
+      "noncandidate-column",
+      activeCount > 0 && !isCandidate
+    );
+  });
+
+  document.querySelectorAll(".feature-control").forEach(control => {
+    const featureKey = control.dataset.feature;
+    const isActive = featureKey in selections;
+    control.classList.toggle("active", isActive);
+
+    control.querySelectorAll(".value-button").forEach(button => {
+      const pressed =
+        isActive && selections[featureKey] === button.dataset.value;
+      button.setAttribute("aria-pressed", String(pressed));
+    });
+  });
+
+  status.textContent =
+    `${matchingIndexes.length} candidato${
+      matchingIndexes.length === 1 ? "" : "s"
+    } · ${activeCount} traço${
+      activeCount === 1 ? "" : "s"
+    } escolhido${activeCount === 1 ? "" : "s"}`;
+
+  resetButton.disabled = activeCount === 0;
+  undoButton.disabled = activeCount === 0;
+
+  renderCandidateList(matchingIndexes, activeCount);
+  renderHistory();
+}
+
+
+function buildPhonemeSelector() {
+  consonants.forEach((consonant, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "phoneme-select-button";
+    button.textContent = consonant.symbol;
+    button.dataset.consonantIndex = index;
+    button.setAttribute("aria-pressed", "false");
+    button.setAttribute("aria-label", `Selecionar ${consonant.symbol}`);
+
+    button.addEventListener("click", () => {
+      if (selectedPhonemes.has(index)) {
+        selectedPhonemes.delete(index);
+      } else {
+        selectedPhonemes.add(index);
+      }
+      renderComparison();
+    });
+
+    phonemeSelector.appendChild(button);
+  });
+}
+
+function getCommonFeatures() {
+  const indexes = Array.from(selectedPhonemes);
+  const result = [];
+
+  if (indexes.length < 2) return result;
+
+  features.forEach((feature, featureIndex) => {
+    const firstValue = consonants[indexes[0]].values[featureIndex];
+    const allEqual = indexes.every(
+      index => consonants[index].values[featureIndex] === firstValue
+    );
+
+    if (allEqual) {
+      result.push({ feature, value: firstValue, featureIndex });
+    }
+  });
+
+  return result;
+}
+
+function clearComparisonHighlights() {
+  document.querySelectorAll(".selected-phoneme-column").forEach(cell => {
+    cell.classList.remove("selected-phoneme-column");
+  });
+
+  document.querySelectorAll(".common-feature-cell").forEach(cell => {
+    cell.classList.remove("common-feature-cell");
+  });
+
+  document.querySelectorAll(".common-mark").forEach(cell => {
+    cell.classList.remove("common-mark");
+  });
+}
+
+function renderComparison() {
+  clearComparisonHighlights();
+
+  document.querySelectorAll(".phoneme-select-button").forEach(button => {
+    const index = Number(button.dataset.consonantIndex);
+    button.setAttribute(
+      "aria-pressed",
+      String(selectedPhonemes.has(index))
+    );
+  });
+
+  clearPhonemesButton.disabled = selectedPhonemes.size === 0;
+
+  if (currentMode !== "compare") return;
+
+  selectedPhonemes.forEach(index => {
+    document.querySelectorAll(
+      `[data-consonant-index="${index}"]`
+    ).forEach(cell => {
+      cell.classList.add("selected-phoneme-column");
+    });
+  });
+
+  const commonFeatures = getCommonFeatures();
+  commonList.innerHTML = "";
+
+  if (selectedPhonemes.size < 2) {
+    commonList.innerHTML =
+      '<span class="compare-empty">Selecione pelo menos dois fonemas.</span>';
+    return;
+  }
+
+  if (commonFeatures.length === 0) {
+    commonList.innerHTML =
+      '<span class="compare-empty">Esses fonemas não compartilham nenhuma marcação entre os traços disponíveis.</span>';
+    return;
+  }
+
+  commonFeatures.forEach(({ feature, value }) => {
+    const chip = document.createElement("span");
+    chip.className = "common-chip";
+    chip.textContent = `${feature.label.toLowerCase()}: ${value}`;
+    commonList.appendChild(chip);
+
+    document.querySelectorAll(
+      `.feature-cell[data-feature-key="${feature.key}"]`
+    ).forEach(cell => {
+      cell.classList.add("common-feature-cell");
+    });
+
+    selectedPhonemes.forEach(index => {
+      document.querySelectorAll(
+        `.mark[data-feature-key="${feature.key}"][data-consonant-index="${index}"]`
+      ).forEach(cell => {
+        cell.classList.add("common-mark");
+      });
+    });
+  });
+}
+
+function setMode(mode) {
+  currentMode = mode;
+
+  const isFilter = mode === "filter";
+  filterModeButton.setAttribute("aria-pressed", String(isFilter));
+  compareModeButton.setAttribute("aria-pressed", String(!isFilter));
+
+  document.querySelectorAll(".filter-only").forEach(element => {
+    element.classList.toggle("hidden-mode", !isFilter);
+  });
+
+  comparePanel.classList.toggle("active", !isFilter);
+
+  if (isFilter) {
+    clearComparisonHighlights();
+    render();
+  } else {
+    document.querySelectorAll(".candidate-column, .noncandidate-column")
+      .forEach(cell => {
+        cell.classList.remove("candidate-column", "noncandidate-column");
+      });
+    renderComparison();
+  }
+}
+
+filterModeButton.addEventListener("click", () => setMode("filter"));
+compareModeButton.addEventListener("click", () => setMode("compare"));
+
+clearPhonemesButton.addEventListener("click", () => {
+  selectedPhonemes.clear();
+  renderComparison();
+});
+
+resetButton.addEventListener("click", clearAll);
+undoButton.addEventListener("click", undoLast);
+
+buildGrid();
+buildControls();
+buildPhonemeSelector();
+render();
+setMode("filter");
+</script>
+</body>
+</html>
